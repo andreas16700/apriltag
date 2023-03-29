@@ -666,7 +666,34 @@ def main():
             while cv2.waitKey(5) < 0:
                 pass
 
+def visualizeLine(img, point1, point2):
+    # Calculate the slope and y-intercept of the line
+    x1, y1 = point2
+    x2, y2 = point1
+    m = (y2 - y1) / (x2 - x1)
+    b = y1 - m * x1
 
+    # Generate a series of points that lie on the line
+    x_vals = numpy.arange(min(x1,x2), max(x1, x2) + 1)
+    y_vals = numpy.array([int(m * x + b) for x in x_vals])
+    points = numpy.array([(x_vals[i], y_vals[i]) for i in range(len(x_vals))])
+
+    # Set the color of the line
+    color = (255, 0, 255)  # red color
+
+    # Set the thickness of the line
+    thickness = 2
+
+    # Draw the line
+    for i in range(len(points) - 1):
+        cv2.line(img, points[i], points[i + 1], color, thickness)
+
+    # Display the image with the line
+    cv2.imshow('Image with line', img)
+
+    # Wait for a key press and close the window
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 def calculatePointAbove(bottom, top):
     d = numpy.linalg.norm(bottom - top)
     # Get the slope and intercept of the line L
@@ -700,11 +727,15 @@ def calculate_new_corners_triangle(current_corners):
     TTR = calculatePointAbove(current_corners[2], current_corners[1])
     # cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 255, 0), 2)
     print(current_corners)
-    cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 255, 0), 2)
+    # cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 255, 0), 2)
     t_mid = calc_midpoint(TTR, TTL)
     pts = numpy.array([TTL,TTR, current_corners[0], current_corners[1]], numpy.int32)
     return pts
 
+# def get_bottom_and_up(for_left, corners):
+#     max_
+#     for c in corners:
+#         x,y = c
 
 def calculate_corners_of_traffic_lights(img):
     gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -712,9 +743,19 @@ def calculate_corners_of_traffic_lights(img):
     detections = detector.detect(gray_img)
     # Get the corners of the first detection
     corners = detections[0].corners.astype(int)
-    # cv2.line(img, tuple(corners[0]), tuple(corners[1]), (0, 0, 255), 2)
-    # cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 255, 0), 2)
+    cv2.line(img, tuple(corners[0]), tuple(corners[1]), (0, 0, 255), 2)
+    # cv2.line(img, tuple(corners[0]), tuple(corners[2]), (0, 0, 255), 2)
+    cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 0, 255), 2)
 
+    TTL = calculatePointAbove(corners[0], corners[3])
+    # TTR = calculatePointAbove(corners[2], corners[1])
+    #
+    cv2.line(img, tuple(corners[0]), tuple(TTL), (0, 255, 0), 2)
+    # cv2.line(img, tuple(corners[0]), tuple(TTR), (0, 255, 0), 2)
+    # cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 255, 0), 2)
+    cv2.imshow('img', img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
     new_corners = calculate_new_corners_triangle(corners)
     new_corners = new_corners.reshape((-1, 1, 2))
     return new_corners
