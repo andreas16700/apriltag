@@ -820,31 +820,6 @@ def find_light_color(img, points):
     print(f'The brightest color in the trapezoid is {brightest_color}.')
 
 
-def findLightColor(img, corners):
-    # Find the minimum and maximum x and y coordinates of the rectangle
-    x_coords = [p[0] for p in corners]
-    y_coords = [p[1] for p in corners]
-    x1, x2 = min(x_coords), max(x_coords)
-    y1, y2 = min(y_coords), max(y_coords)
-
-    # Crop the region of interest (ROI) using the corner coordinates
-    src = numpy.array(corners, dtype=numpy.float32)
-    dst = numpy.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=numpy.float32)
-    M = cv2.getPerspectiveTransform(src, dst)
-    roi = cv2.warpPerspective(img, M, (img.shape[1], img.shape[0]))
-
-    # Calculate the average color values for each color channel (red, green, blue)
-    r_avg = numpy.mean(roi[:, :, 2])
-    g_avg = numpy.mean(roi[:, :, 1])
-    b_avg = numpy.mean(roi[:, :, 0])
-
-    # Determine which color is the brightest
-    if r_avg > g_avg and r_avg > b_avg:
-        print("The brightest color in the rectangle is red.")
-    elif g_avg > r_avg and g_avg > b_avg:
-        print("The brightest color in the rectangle is green.")
-    else:
-        print("The brightest color in the rectangle is yellow.")
 
 
 def process_image(filename):
@@ -856,7 +831,7 @@ def process_image(filename):
 
     cv2.fillPoly(img, [traf_light_corners], (255, 0, 0))
     # findLightColor(img,traf_light_corners)
-    # find_light_color(img, traf_light_corners)
+    find_light_color(img, traf_light_corners)
     # Show the image
     cv2.imshow("AprilTag Detection", img)
     cv2.waitKey(0)
