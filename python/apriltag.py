@@ -18,15 +18,11 @@ import collections
 import os
 import re
 import numpy
+import cv2
 
 _HAVE_CV2 = False
 
-if __name__ == '__main__':
-    try:
-        import cv2
-        _HAVE_CV2 = True
-    except:
-        pass
+COLOR_THRESHOLD = 200
 
 ######################################################################
 
@@ -41,13 +37,15 @@ class _ImageU8(ctypes.Structure):
         ('buf', ctypes.POINTER(ctypes.c_uint8))
     ]
 
+
 class _Matd(ctypes.Structure):
     '''Wraps matd C struct.'''
     _fields_ = [
         ('nrows', ctypes.c_int),
         ('ncols', ctypes.c_int),
-        ('data', ctypes.c_double*1),
+        ('data', ctypes.c_double * 1),
     ]
+
 
 class _ZArray(ctypes.Structure):
     '''Wraps zarray C struct.'''
@@ -57,6 +55,7 @@ class _ZArray(ctypes.Structure):
         ('alloc', ctypes.c_int),
         ('data', ctypes.c_void_p)
     ]
+
 
 class _ApriltagFamily(ctypes.Structure):
     '''Wraps apriltag_family C struct.'''
@@ -69,6 +68,7 @@ class _ApriltagFamily(ctypes.Structure):
         ('name', ctypes.c_char_p),
     ]
 
+
 class _ApriltagDetection(ctypes.Structure):
     '''Wraps apriltag_detection C struct.'''
     _fields_ = [
@@ -78,9 +78,10 @@ class _ApriltagDetection(ctypes.Structure):
         ('goodness', ctypes.c_float),
         ('decision_margin', ctypes.c_float),
         ('H', ctypes.POINTER(_Matd)),
-        ('c', ctypes.c_double*2),
-        ('p', (ctypes.c_double*2)*4)
+        ('c', ctypes.c_double * 2),
+        ('p', (ctypes.c_double * 2) * 4)
     ]
+
 
 class _ApriltagDetector(ctypes.Structure):
     '''Wraps apriltag_detector C struct.'''
@@ -95,18 +96,21 @@ class _ApriltagDetector(ctypes.Structure):
         ('quad_contours', ctypes.c_int),
     ]
 
+
 ######################################################################
 
 def _ptr_to_array2d(datatype, ptr, rows, cols):
-    array_type = (datatype*cols)*rows
+    array_type = (datatype * cols) * rows
     array_buf = array_type.from_address(ctypes.addressof(ptr))
     return numpy.ctypeslib.as_array(array_buf, shape=(rows, cols))
+
 
 def _image_u8_get_array(img_ptr):
     return _ptr_to_array2d(ctypes.c_uint8,
                            img_ptr.contents.buf.contents,
                            img_ptr.contents.height,
                            img_ptr.contents.stride)
+
 
 def _matd_get_array(mat_ptr):
     return _ptr_to_array2d(ctypes.c_double,
@@ -122,8 +126,8 @@ DetectionBase = collections.namedtuple(
     'tag_family, tag_id, hamming, goodness, decision_margin, '
     'homography, center, corners')
 
-class Detection(DetectionBase):
 
+class Detection(DetectionBase):
     '''Pythonic wrapper for apriltag_detection which derives from named
 tuple class.
 
@@ -141,7 +145,7 @@ tuple class.
         '''Converts this object to a string with the given level of indentation.'''
 
         rval = []
-        indent_str = ' '*(self._max_len+2+indent)
+        indent_str = ' ' * (self._max_len + 2 + indent)
 
         if not values:
             values = collections.OrderedDict(zip(self._print_fields, self))
@@ -152,30 +156,30 @@ tuple class.
 
             if value_str.find('\n') > 0:
                 value_str = value_str.split('\n')
-                value_str = [value_str[0]] + [indent_str+v for v in value_str[1:]]
+                value_str = [value_str[0]] + [indent_str + v for v in value_str[1:]]
                 value_str = '\n'.join(value_str)
 
             rval.append('{:>{}s}: {}'.format(
-                label, self._max_len+indent, value_str))
+                label, self._max_len + indent, value_str))
 
         return '\n'.join(rval)
 
     def __str__(self):
         return self.tostring().encode('ascii')
 
+
 ######################################################################
 
 
 class DetectorOptions(object):
-
     '''Convience wrapper for object to pass into Detector
 initializer. You can also pass in the output of an
 argparse.ArgumentParser on which you have called add_arguments.
 
     '''
 
-# pylint: disable=R0902
-# pylint: disable=R0913
+    # pylint: disable=R0902
+    # pylint: disable=R0913
 
     def __init__(self,
                  families='tag36h11',
@@ -188,7 +192,6 @@ argparse.ArgumentParser on which you have called add_arguments.
                  refine_pose=False,
                  debug=False,
                  quad_contours=True):
-
         self.families = families
         self.border = int(border)
 
@@ -201,10 +204,10 @@ argparse.ArgumentParser on which you have called add_arguments.
         self.debug = int(debug)
         self.quad_contours = quad_contours
 
+
 ######################################################################
 
 def add_arguments(parser):
-
     '''Add arguments to the given argparse.ArgumentParser object to enable
 passing in the resulting parsed arguments into the initializer for
 Detector.
@@ -256,7 +259,6 @@ Detector.
 ######################################################################
 
 class Detector(object):
-
     '''Pythonic wrapper for apriltag_detector. Initialize by passing in
 the output of an argparse.ArgumentParser on which you have called
 add_arguments; or an instance of the DetectorOptions class.  You can
@@ -277,9 +279,9 @@ library used by ctypes.
         if uname0 == 'Darwin':
             extension = '.dylib'
         else:
-            extension = '.so' # TODO test on windows?
+            extension = '.so'  # TODO test on windows?
 
-        filename = 'libapriltag'+extension
+        filename = 'libapriltag' + extension
 
         self.libc = None
         self.tag_detector = None
@@ -352,14 +354,13 @@ image of type numpy.uint8.'''
 
         return_info = []
 
-        #detect apriltags in the image
+        # detect apriltags in the image
         detections = self.libc.apriltag_detector_detect(self.tag_detector, c_img)
 
         apriltag = ctypes.POINTER(_ApriltagDetection)()
-        
-        for i in range(0, detections.contents.size):
 
-            #extract the data for each apriltag that was identified
+        for i in range(0, detections.contents.size):
+            # extract the data for each apriltag that was identified
             self.libc.zarray_get(detections, i, ctypes.byref(apriltag))
 
             tag = apriltag.contents
@@ -378,7 +379,7 @@ image of type numpy.uint8.'''
                 center,
                 corners)
 
-            #Append this dict to the tag data array
+            # Append this dict to the tag data array
             return_info.append(detection)
 
         self.libc.image_u8_destroy(c_img)
@@ -396,7 +397,6 @@ image of type numpy.uint8.'''
 
         return rval
 
-
     def add_tag_family(self, name):
 
         '''Add a single tag family to this detector.'''
@@ -411,8 +411,8 @@ image of type numpy.uint8.'''
 
     def detection_pose(self, detection, camera_params, tag_size=1, z_sign=1):
 
-        fx, fy, cx, cy = [ ctypes.c_double(c) for c in camera_params ]
-        
+        fx, fy, cx, cy = [ctypes.c_double(c) for c in camera_params]
+
         H = self.libc.matd_create(3, 3)
         arr = _matd_get_array(H)
         arr[:] = detection.homography
@@ -424,7 +424,7 @@ image of type numpy.uint8.'''
 
         init_error = ctypes.c_double(0)
         final_error = ctypes.c_double(0)
-        
+
         Mptr = self.libc.pose_from_homography(H, fx, fy, cx, cy,
                                               ctypes.c_double(tag_size),
                                               ctypes.c_double(z_sign),
@@ -480,44 +480,44 @@ image of type numpy.uint8.'''
         # the underlying data is still in c_img.
         return c_img
 
+
 ######################################################################
 
 def _get_demo_searchpath():
-    
     return [
         os.path.join(os.path.dirname(__file__), '../build/lib'),
         os.path.join(os.getcwd(), '../build/lib')
     ]
 
+
 ######################################################################
 
 def _camera_params(pstr):
-    
     pstr = pstr.strip()
-    
+
     if pstr[0] == '(' and pstr[-1] == ')':
         pstr = pstr[1:-1]
 
-    params = tuple( [ float(param.strip()) for param in pstr.split(',') ] )
+    params = tuple([float(param.strip()) for param in pstr.split(',')])
 
-    assert( len(params) ==  4)
+    assert (len(params) == 4)
 
     return params
+
 
 ######################################################################
 
 def _draw_pose(overlay, camera_params, tag_size, pose, z_sign=1):
-
     opoints = numpy.array([
         -1, -1, 0,
-         1, -1, 0,
-         1,  1, 0,
-        -1,  1, 0,
-        -1, -1, -2*z_sign,
-         1, -1, -2*z_sign,
-         1,  1, -2*z_sign,
-        -1,  1, -2*z_sign,
-    ]).reshape(-1, 1, 3) * 0.5*tag_size
+        1, -1, 0,
+        1, 1, 0,
+        -1, 1, 0,
+        -1, -1, -2 * z_sign,
+        1, -1, -2 * z_sign,
+        1, 1, -2 * z_sign,
+        -1, 1, -2 * z_sign,
+    ]).reshape(-1, 1, 3) * 0.5 * tag_size
 
     edges = numpy.array([
         0, 1,
@@ -533,12 +533,12 @@ def _draw_pose(overlay, camera_params, tag_size, pose, z_sign=1):
         6, 7,
         7, 4
     ]).reshape(-1, 2)
-        
+
     fx, fy, cx, cy = camera_params
 
     K = numpy.array([fx, 0, cx, 0, fy, cy, 0, 0, 1]).reshape(3, 3)
 
-    rvec, _ = cv2.Rodrigues(pose[:3,:3])
+    rvec, _ = cv2.Rodrigues(pose[:3, :3])
     tvec = pose[:3, 3]
 
     dcoeffs = numpy.zeros(5)
@@ -546,18 +546,16 @@ def _draw_pose(overlay, camera_params, tag_size, pose, z_sign=1):
     ipoints, _ = cv2.projectPoints(opoints, rvec, tvec, K, dcoeffs)
 
     ipoints = numpy.round(ipoints).astype(int)
-    
+
     ipoints = [tuple(pt) for pt in ipoints.reshape(-1, 2)]
 
     for i, j in edges:
         cv2.line(overlay, ipoints[i], ipoints[j], (0, 255, 0), 1, 16)
 
-    
 
 ######################################################################
 
 def main():
-
     '''Test function for this Python wrapper.'''
 
     from argparse import ArgumentParser
@@ -595,7 +593,7 @@ def main():
     # for "real" deployments, either install the DLL in the appropriate
     # system-wide library directory, or specify your own search paths
     # as needed.
-    
+
     det = Detector(options, searchpath=_get_demo_searchpath())
 
     use_gui = not options.no_gui
@@ -632,12 +630,12 @@ def main():
             num_detections, os.path.split(filename)[1]))
 
         for i, detection in enumerate(detections):
-            print( 'Detection {} of {}:'.format(i+1, num_detections))
+            print('Detection {} of {}:'.format(i + 1, num_detections))
             print()
             print(detection.tostring(indent=2))
 
             if options.camera_params is not None:
-                
+
                 pose, e0, e1 = det.detection_pose(detection,
                                                   options.camera_params,
                                                   options.tag_size)
@@ -647,15 +645,14 @@ def main():
                                options.camera_params,
                                options.tag_size,
                                pose)
-                
+
                 print(detection.tostring(
-                    collections.OrderedDict([('Pose',pose),
+                    collections.OrderedDict([('Pose', pose),
                                              ('InitError', e0),
                                              ('FinalError', e1)]),
                     indent=2))
-                
-            print()
 
+            print()
 
         if options.debug_images:
             if _HAVE_CV2:
@@ -663,13 +660,188 @@ def main():
             else:
                 output = Image.fromarray(overlay)
                 output.save('detections.png')
-            
+
         if use_gui:
             cv2.imshow('win', overlay)
             while cv2.waitKey(5) < 0:
                 pass
 
 
-if __name__ == '__main__':
-    main()
+def calculatePointAbove(bottom, top):
+    d = numpy.linalg.norm(bottom - top)
+    # Get the slope and intercept of the line L
+    x1, y1 = top
+    x2, y2 = bottom
+    m = (y2 - y1) / (x2 - x1)
+    b = y1 - m * x1
 
+    # Calculate the point TTL on the line L with distance of D from TL
+    x = int((d ** 2 / (1 + m ** 2)) ** 0.5 + x1)
+    y = int(m * x + b)
+    new_top = (x, y)
+    return new_top
+
+
+def calc_midpoint(l, r):
+    x1, y1 = l
+    x2, y2 = r
+    return ((x1 + x2) / 2), ((y1 + y2) / 2)
+
+
+def calculate_new_corners(current_corners):
+    TTL = calculatePointAbove(current_corners[3], current_corners[0])
+    TTR = calculatePointAbove(current_corners[2], current_corners[1])
+    pts = numpy.array([TTL, TTR, current_corners[1], current_corners[0]], numpy.int32)
+    return pts
+
+
+def calculate_new_corners_triangle(current_corners):
+    TTL = calculatePointAbove(current_corners[3], current_corners[0])
+    TTR = calculatePointAbove(current_corners[2], current_corners[1])
+    # cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 255, 0), 2)
+    print(current_corners)
+    cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 255, 0), 2)
+    t_mid = calc_midpoint(TTR, TTL)
+    pts = numpy.array([TTL,TTR, current_corners[0], current_corners[1]], numpy.int32)
+    return pts
+
+
+def calculate_corners_of_traffic_lights(img):
+    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    detector = Detector(DetectorOptions(families="tag36h11"))
+    detections = detector.detect(gray_img)
+    # Get the corners of the first detection
+    corners = detections[0].corners.astype(int)
+    # cv2.line(img, tuple(corners[0]), tuple(corners[1]), (0, 0, 255), 2)
+    # cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 255, 0), 2)
+
+    new_corners = calculate_new_corners_triangle(corners)
+    new_corners = new_corners.reshape((-1, 1, 2))
+    return new_corners
+
+
+def color_masked_area_purple(img, mask):
+    # Create a purple color
+    purple = (128, 0, 128)
+
+    # Create a new image filled with the purple color
+    purple_img = numpy.full_like(img, purple)
+
+    # Mask the purple image to only select the trapezoid
+    masked_purple_img = cv2.bitwise_and(purple_img, purple_img, mask=mask)
+
+    # Combine the original image and the masked purple image
+    final_img = cv2.addWeighted(img, 1, masked_purple_img, 1, 0)
+
+    # Display the final image
+    cv2.imshow('Final Image', final_img)
+    cv2.waitKey(0)
+
+def get_mean_of_channel(chan_name,channel, zeros):
+    channel[channel < COLOR_THRESHOLD] = 0
+    cv2.imshow(f"{chan_name}", cv2.merge([zeros, zeros, channel]))
+    cv2.waitKey(0)
+    channel = channel[channel >= COLOR_THRESHOLD]
+    mean_channel = numpy.mean(channel) if channel.size>0 else 0
+    return mean_channel
+
+def find_light_color(img, points):
+    # Create a mask for the trapezoid
+    mask = numpy.zeros(img.shape[:2], dtype=numpy.uint8)
+    cv2.fillPoly(mask, [points], 255)
+
+    # Mask the image to only select the trapezoid
+    masked_img = cv2.bitwise_and(img, img, mask=mask)
+
+    color_masked_area_purple(img, mask)
+
+    # Split the image into its color channels
+    b, g, r = cv2.split(masked_img)
+    zeros = numpy.zeros(masked_img.shape[:2], dtype="uint8")
+
+    mean_b = get_mean_of_channel('Blue', b, zeros)
+    mean_g = get_mean_of_channel('Green', g, zeros)
+    mean_r = get_mean_of_channel('Red', r, zeros)
+    r_pl_gr = (mean_r + mean_g) / 2
+    print(f'b:{mean_b}\ng:{mean_g}\nr:{mean_r}\nr+g:{r_pl_gr}')
+    # Find the brightest color
+    if mean_r > mean_g:
+        if mean_r > mean_b:
+            brightest_color = 'red'
+        else:
+            brightest_color = 'blue'
+    else:
+        if mean_g > mean_b:
+            brightest_color = 'green'
+        else:
+            brightest_color = 'blue'
+
+    print(f'The brightest color in the trapezoid is {brightest_color}.')
+
+
+def findLightColor(img, corners):
+    # Find the minimum and maximum x and y coordinates of the rectangle
+    x_coords = [p[0] for p in corners]
+    y_coords = [p[1] for p in corners]
+    x1, x2 = min(x_coords), max(x_coords)
+    y1, y2 = min(y_coords), max(y_coords)
+
+    # Crop the region of interest (ROI) using the corner coordinates
+    src = numpy.array(corners, dtype=numpy.float32)
+    dst = numpy.array([[x1, y1], [x2, y1], [x2, y2], [x1, y2]], dtype=numpy.float32)
+    M = cv2.getPerspectiveTransform(src, dst)
+    roi = cv2.warpPerspective(img, M, (img.shape[1], img.shape[0]))
+
+    # Calculate the average color values for each color channel (red, green, blue)
+    r_avg = numpy.mean(roi[:, :, 2])
+    g_avg = numpy.mean(roi[:, :, 1])
+    b_avg = numpy.mean(roi[:, :, 0])
+
+    # Determine which color is the brightest
+    if r_avg > g_avg and r_avg > b_avg:
+        print("The brightest color in the rectangle is red.")
+    elif g_avg > r_avg and g_avg > b_avg:
+        print("The brightest color in the rectangle is green.")
+    else:
+        print("The brightest color in the rectangle is yellow.")
+
+
+def process_image(filename):
+    # Load the image into a numpy array
+    img = cv2.imread(filename)
+
+    traf_light_corners = calculate_corners_of_traffic_lights(img)
+
+
+    cv2.fillPoly(img, [traf_light_corners], (255, 0, 0))
+    # findLightColor(img,traf_light_corners)
+    # find_light_color(img, traf_light_corners)
+    # Show the image
+    cv2.imshow("AprilTag Detection", img)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+if __name__ == '__main__':
+    # print('yellow:')
+    # process_image('../build/lights/close_yellow.jpeg')
+    # print('red:')
+    # process_image('../build/lights/close_red.jpeg')
+    print('green:')
+    process_image('../build/lights/far_yellow.png')
+    # print('dsfergetg')
+
+    #
+    # # Display the original and grayscale images (just for demonstration purposes)
+    # cv2.imshow('Original Image', img)
+    # cv2.imshow('Grayscale Image', gray_img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    # try:
+    #     import cv2
+    #     _HAVE_CV2 = True
+    # except:
+    #     pass
+#
+# if __name__ == '__main__':
+#     main()

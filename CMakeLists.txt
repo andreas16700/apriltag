@@ -7,8 +7,8 @@ cmake_policy(SET CMP0042 NEW)
 endif(POLICY CMP0042)
 
 find_package (Threads REQUIRED)
-
-set(EXTRA_FLAGS "-Wall -Wsign-compare -g -march=native ${CMAKE_THREAD_LIBS_INIT}")
+# set(EXTRA_FLAGS "-Wall -Wsign-compare -g -march=native ${CMAKE_THREAD_LIBS_INIT}")
+set(EXTRA_FLAGS "-Wall -Wsign-compare -g -mcpu=apple-m1 ${CMAKE_THREAD_LIBS_INIT}")
 set(EXTRA_C_FLAGS "${EXTRA_FLAGS} -std=gnu99")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${EXTRA_FLAGS}")
