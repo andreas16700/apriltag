@@ -699,13 +699,19 @@ def calculatePointAbove(bottom, top):
     # Get the slope and intercept of the line L
     x1, y1 = top
     x2, y2 = bottom
-    m = (y2 - y1) / (x2 - x1)
+    m = 0 if (x2-x1 == 0) else (y2 - y1) / (x2 - x1)
     b = y1 - m * x1
 
+    dy = y1-y2
+    y3 = (y1+dy) * 1.0
+    # y=mx+b
+    # x = (y-b)/m
+    x3 = (y3-b)/m
+
     # Calculate the point TTL on the line L with distance of D from TL
-    x = int((d ** 2 / (1 + m ** 2)) ** 0.5 + x1)
-    y = int(m * x + b)
-    new_top = (x, y)
+    # x3 = int((d ** 2 / (1 + m ** 2)) ** 0.5 + x1)
+    # y3 = int(m * x3 + b)
+    new_top = (int(x3), int(y3))
     return new_top
 
 
@@ -743,21 +749,25 @@ def calculate_corners_of_traffic_lights(img):
     detections = detector.detect(gray_img)
     # Get the corners of the first detection
     corners = detections[0].corners.astype(int)
-    cv2.line(img, tuple(corners[0]), tuple(corners[1]), (0, 0, 255), 2)
+    # cv2.line(img, tuple(corners[0]), tuple(corners[1]), (0, 0, 255), 2)
     # cv2.line(img, tuple(corners[0]), tuple(corners[2]), (0, 0, 255), 2)
-    cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 0, 255), 2)
-
-    TTL = calculatePointAbove(corners[0], corners[3])
-    # TTR = calculatePointAbove(corners[2], corners[1])
+    # cv2.line(img, tuple(corners[0]), tuple(corners[3]), (255, 0, 255), 2)
+    # cv2.imshow('img', img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    TTL = calculatePointAbove(corners[3], corners[0])
+    TTR = calculatePointAbove(corners[2], corners[1])
     #
-    cv2.line(img, tuple(corners[0]), tuple(TTL), (0, 255, 0), 2)
-    # cv2.line(img, tuple(corners[0]), tuple(TTR), (0, 255, 0), 2)
+    # cv2.line(img, tuple(corners[0]), TTL, (0, 255, 0), 2)
+    # cv2.line(img, tuple(corners[0]), TTL, (0, 0, 255), 2)
+    # cv2.line(img, tuple(corners[1]), tuple(TTR), (0, 255, 0), 2)
     # cv2.line(img, tuple(corners[0]), tuple(corners[3]), (0, 255, 0), 2)
-    cv2.imshow('img', img)
+    cv2.imshow('new points', img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-    new_corners = calculate_new_corners_triangle(corners)
-    new_corners = new_corners.reshape((-1, 1, 2))
+    new_corners =  tuple(corners[0]), tuple(corners[1]), TTL, TTR
+    # new_corners = calculate_new_corners_triangle(corners)
+    # new_corners = new_corners.reshape((-1, 1, 2))
     return new_corners
 
 
@@ -820,8 +830,62 @@ def find_light_color(img, points):
     print(f'The brightest color in the trapezoid is {brightest_color}.')
 
 
+def crop_image(img, tl, tr, br, bl):
+    """
+        Crops an image to the specified quadrilateral area defined by the corner points.
+
+        Parameters:
+            img: input image (as a NumPy array).
+            bl, br, tl, tr: (x, y) tuples of the four corner points (in clockwise order, starting from bl).
+
+        Returns:
+            The cropped image (as a NumPy array).
+        """
+
+    # Define three non-collinear points in the source image (in clockwise order, starting from tl)
+    src_pts = numpy.array([tl, tr, bl], dtype=numpy.float32)
+
+    # Define the corresponding points in the destination image (top-left, top-right, bottom-left respectively)
+    dst_width = int(numpy.round(numpy.sqrt((bl[1] - tl[1]) ** 2 + (bl[0] - tl[0]) ** 2)))
+    dst_height = int(numpy.round(numpy.sqrt((tr[1] - tl[1]) ** 2 + (tr[0] - tl[0]) ** 2)))
+    dst_pts = numpy.array([(0, 0), (dst_width, 0), (0, dst_height)], dtype=numpy.float32)
+
+    # Compute the affine transform matrix
+    M = cv2.getAffineTransform(src_pts, dst_pts)
+
+    # Apply the transform to the source image, cropping it
+    cropped_img = cv2.warpAffine(img, M, (dst_width, dst_height))
+
+    # Return the cropped image
+    return cropped_img
 
 
+def draw_shape(img, corners):
+    """
+    Draws a red shape on the given image using the specified corner points.
+
+    Parameters:
+        img: input image (as a NumPy array).
+        corners: tuple of corner points (bl, br, tl, tr), where each element is a (x, y) tuple.
+
+    Returns:
+        The image with the shape drawn (as a NumPy array).
+    """
+
+    # Create a copy of the image to avoid modifying the original
+    img_with_shape = img.copy()
+
+    # Convert the corner points to a NumPy array of shape (4, 2)
+    pts = numpy.array(corners, numpy.int32)
+
+    # Reshape the array to shape (1, 4, 2) to match the expected format of cv2.polylines()
+    pts = pts.reshape((-1, 1, 2))
+
+    # Draw the shape on the image
+    cv2.polylines(img_with_shape, [pts], True, (0, 0, 255), thickness=2)
+
+    # Return the image with the shape drawn
+    return img_with_shape
 def process_image(filename):
     # Load the image into a numpy array
     img = cv2.imread(filename)
@@ -829,21 +893,32 @@ def process_image(filename):
     traf_light_corners = calculate_corners_of_traffic_lights(img)
 
 
-    cv2.fillPoly(img, [traf_light_corners], (255, 0, 0))
+    # cv2.fillPoly(img, [traf_light_corners], (255, 0, 0))
+    bl, br, tl, tr = traf_light_corners
+    corners = (bl, br, tr, tl)
+
+    # Draw the shape on the image
+    img_with_shape = draw_shape(img, corners)
+
+    # Display the image with the shape drawn
+    cv2.imshow('Image with shape', img_with_shape)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    cropped = crop_image(img, tl, tr, br, bl)
     # findLightColor(img,traf_light_corners)
-    find_light_color(img, traf_light_corners)
+    # find_light_color(img, traf_light_corners)
     # Show the image
-    cv2.imshow("AprilTag Detection", img)
+    cv2.imshow("cropped", cropped)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
     # print('yellow:')
-    # process_image('../build/lights/close_yellow.jpeg')
+    process_image('../build/lights/close_yellow.jpeg')
     # print('red:')
-    # process_image('../build/lights/close_red.jpeg')
-    print('green:')
+    process_image('../build/lights/close_red.jpeg')
+    # print('green:')
     process_image('../build/lights/far_yellow.png')
     # print('dsfergetg')
 
